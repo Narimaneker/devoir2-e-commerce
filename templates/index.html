@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gestion des Étudiants</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        margin: 0;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        max-width: 1200px;
+        margin: 0 auto;
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      }
+      h1,
+      h2 {
+        color: #333;
+      }
+      .section {
+        margin-bottom: 30px;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      button {
+        background-color: #4caf50;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin: 5px 0;
+      }
+      button:hover {
+        background-color: #45a049;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 20px 0;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+      th {
+        background-color: #f2f2f2;
+      }
+      tr:nth-child(even) {
+        background-color: #f9f9f9;
+      }
+      .form-group {
+        margin-bottom: 15px;
+      }
+      input,
+      select {
+        width: 100%;
+        padding: 8px;
+        margin: 5px 0;
+        display: inline-block;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Gestion des Étudiants</h1>
+
+      <!-- Formulaire d'ajout -->
+      <div class="section">
+        <h2>Ajouter un Étudiant</h2>
+        <div class="form-group">
+          <label for="matricule">Matricule:</label>
+          <input type="text" id="matricule" required />
+        </div>
+        <div class="form-group">
+          <label for="nom">Nom:</label>
+          <input type="text" id="nom" required />
+        </div>
+        <div class="form-group">
+          <label for="prenom">Prénom:</label>
+          <input type="text" id="prenom" required />
+        </div>
+        <div class="form-group">
+          <label for="moyenne">Moyenne Générale:</label>
+          <input
+            type="number"
+            id="moyenne"
+            step="0.01"
+            min="0"
+            max="20"
+            required
+          />
+        </div>
+        <div class="form-group">
+          <label for="section">Section:</label>
+          <input type="text" id="section" required />
+        </div>
+        <button onclick="addStudent()">Ajouter Étudiant</button>
+      </div>
+
+      <!-- Recherche par section -->
+      <div class="section">
+        <h2>Rechercher par Section</h2>
+        <div class="form-group">
+          <label for="searchSection">Section:</label>
+          <input
+            type="text"
+            id="searchSection"
+            placeholder="Entrez une section"
+          />
+        </div>
+        <button onclick="getStudentsBySection()">Rechercher</button>
+        <button onclick="getMajor()">Afficher le Major</button>
+        <div id="sectionResults"></div>
+      </div>
+
+      <!-- Statistiques -->
+      <div class="section">
+        <h2>Statistiques</h2>
+        <button onclick="countBien()">Compter les 'Bien'</button>
+        <button onclick="deletePassable()">Supprimer les 'Passable'</button>
+        <div id="statsResults"></div>
+      </div>
+
+      <!-- Liste complète -->
+      <div class="section">
+        <h2>Tous les Étudiants</h2>
+        <button onclick="getAllStudents()">Afficher Tous</button>
+        <div id="allStudents"></div>
+      </div>
+    </div>
+
+    <script>
+      // Fonctions pour interagir avec l'API
+      async function fetchData(url, method = "GET", data = null) {
+        const options = {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+          },
+        };
+
+        if (data) {
+          options.body = JSON.stringify(data);
+        }
+
+        try {
+          const response = await fetch(url, options);
+          return await response.json();
+        } catch (error) {
+          console.error("Error:", error);
+          return { error: error.message };
+        }
+      }
+
+      function displayStudents(students, elementId) {
+        const container = document.getElementById(elementId);
+        if (!students || students.length === 0) {
+          container.innerHTML = "<p>Aucun étudiant trouvé</p>";
+          return;
+        }
+
+        let html =
+          "<table><tr><th>Matricule</th><th>Nom</th><th>Prénom</th><th>Moyenne</th><th>Section</th><th>Mention</th></tr>";
+
+        students.forEach((student) => {
+          html += `
+                    <tr>
+                        <td>${student.matricule}</td>
+                        <td>${student.nom}</td>
+                        <td>${student.prenom}</td>
+                        <td>${student.moyenne}</td>
+                        <td>${student.section}</td>
+                        <td>${student.mention}</td>
+                    </tr>
+                `;
+        });
+
+        html += "</table>";
+        container.innerHTML = html;
+      }
+
+      // Fonctions spécifiques
+      async function addStudent() {
+        const student = {
+          matricule: document.getElementById("matricule").value,
+          nom: document.getElementById("nom").value,
+          prenom: document.getElementById("prenom").value,
+          moyenne: parseFloat(document.getElementById("moyenne").value),
+          section: document.getElementById("section").value,
+        };
+
+        const result = await fetchData("/api/students", "POST", student);
+        if (result.success) {
+          alert("Étudiant ajouté avec succès!");
+          getAllStudents();
+        } else {
+          alert(result.error || "Erreur lors de l'ajout");
+        }
+      }
+
+      async function getStudentsBySection() {
+        const section = document.getElementById("searchSection").value;
+        const url = `/api/students${
+          section ? `?section=${encodeURIComponent(section)}` : ""
+        }`;
+        const students = await fetchData(url);
+        displayStudents(students, "sectionResults");
+      }
+
+      async function getMajor() {
+        const section = document.getElementById("searchSection").value;
+        if (!section) {
+          alert("Veuillez entrer une section");
+          return;
+        }
+
+        const major = await fetchData(
+          `/api/students/major?section=${encodeURIComponent(section)}`
+        );
+        if (major.error) {
+          document.getElementById(
+            "sectionResults"
+          ).innerHTML = `<p>${major.error}</p>`;
+        } else {
+          displayStudents([major], "sectionResults");
+        }
+      }
+
+      async function countBien() {
+        const result = await fetchData("/api/students/count/bien");
+        document.getElementById("statsResults").innerHTML = `
+                <p>Nombre d'étudiants avec mention 'Bien': ${result.count}</p>
+            `;
+      }
+
+      async function deletePassable() {
+        if (
+          confirm(
+            'Êtes-vous sûr de vouloir supprimer tous les étudiants avec mention "Passable"?'
+          )
+        ) {
+          const result = await fetchData("/api/students/passable", "DELETE");
+          document.getElementById("statsResults").innerHTML = `
+                    <p>${result.deleted} étudiants supprimés</p>
+                `;
+          getAllStudents();
+        }
+      }
+
+      async function getAllStudents() {
+        const students = await fetchData("/api/students");
+        displayStudents(students, "allStudents");
+      }
+
+      // Charger tous les étudiants au démarrage
+      window.onload = getAllStudents;
+    </script>
+  </body>
+</html>
